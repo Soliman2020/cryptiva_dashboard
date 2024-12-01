@@ -1,6 +1,5 @@
 import streamlit as st
 import pandas as pd
-import plotly.express as px
 import plotly.graph_objects as go
 import os
 
@@ -12,46 +11,34 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Add custom CSS for dark theme
+# Custom CSS for dark theme
 st.markdown("""
     <style>
-    /* Main background */
-    .stApp {
-        background-color: #0E1117;
-        color: #FAFAFA;
-    }
-    
-    /* Sidebar */
-    .css-1d391kg {
-        background-color: #262730;
-    }
-    
-    /* Metric containers */
-    div[data-testid="stMetricValue"] {
-        color: #FAFAFA;
-    }
-    
-    /* Headers */
-    h1, h2, h3 {
-        color: #FAFAFA !important;
-    }
-    
-    /* DataFrames */
-    .dataframe {
-        background-color: #262730;
-        color: #FAFAFA;
-    }
-    
-    /* Slider */
-    .stSlider {
-        background-color: #262730;
-    }
+        .stApp {
+            background-color: #0E1117;
+            color: #FAFAFA;
+        }
+        .stSelectbox [data-baseweb=select] {
+            background-color: #1F2937;
+        }
+        .stSelectbox [data-baseweb=select] div {
+            color: #FAFAFA;
+        }
+        .stSlider [data-baseweb=slider] {
+            background-color: #1F2937;
+        }
+        section[data-testid="stSidebar"] {
+            background-color: #1F2937;
+            color: #FAFAFA;
+        }
+        section[data-testid="stSidebar"] .stMarkdown {
+            color: #FAFAFA;
+        }
+        .stMarkdown {
+            color: #FAFAFA;
+        }
     </style>
-    """, unsafe_allow_html=True)
-
-# Title with emoji
-st.title("📊 Token Performance Dashboard")
-st.markdown('<hr style="border: 2px solid #4A4A4A;">', unsafe_allow_html=True)
+""", unsafe_allow_html=True)
 
 # Data
 data = {
@@ -60,37 +47,26 @@ data = {
               'IOTX', 'FIO', 'KMD', 'BAT', 'EGLD'],
     'Current_PL_Percent': [69.42, 65.82, 63.52, 63.14, 59.85, 59.48, 59.33, 55.39, 51.12, 50.63,
                           50.49, 49.71, 44.43, 41.95, 40.94, 38.22, 36.17, 31.48, 31.38, 31.17,
-                          30.13, 24.21, 23.91, 17.94, 16.04]
+                          30.92, 30.44, 29.85, 28.33, 27.91]
 }
 df = pd.DataFrame(data)
 
 # Sidebar with dark theme
 st.sidebar.markdown("""
     <style>
-    .sidebar .sidebar-content {
-        background-color: #262730;
-    }
+        [data-testid=stSidebar] {
+            background-color: #1F2937;
+        }
     </style>
-    """, unsafe_allow_html=True)
-st.sidebar.header("Filters")
+""", unsafe_allow_html=True)
 
-# Performance Range Filter
+# Filter controls in sidebar
 pl_range = st.sidebar.slider(
-    "Filter by P/L%",
+    "P/L% Range",
     min_value=float(df['Current_PL_Percent'].min()),
     max_value=float(df['Current_PL_Percent'].max()),
     value=(float(df['Current_PL_Percent'].min()), float(df['Current_PL_Percent'].max()))
 )
-
-# Function to display token with image
-def display_token_option(token):
-    col1, col2 = st.columns([1, 4])
-    with col1:
-        image_path = f"token_images/{token.lower()}.png"
-        if os.path.exists(image_path):
-            st.image(image_path, width=20)
-    with col2:
-        st.write(token)
 
 # Token Selection with images
 st.sidebar.write("Select Tokens")
@@ -104,7 +80,10 @@ for token in all_tokens:
     with token_col1:
         image_path = f"token_images/{token.lower()}.png"
         if os.path.exists(image_path):
-            st.image(image_path, width=20)
+            try:
+                st.image(image_path, width=20)
+            except Exception as e:
+                st.write(f"Error loading image for {token}: {str(e)}")
     with token_col2:
         if st.checkbox(token, value=True, key=f"token_{token}"):
             selected_tokens.append(token)
@@ -159,71 +138,32 @@ fig.update_layout(
 
 st.plotly_chart(fig, use_container_width=True)
 
-# Add spacing
-st.markdown("<br>", unsafe_allow_html=True)
-
-# Statistics sections in three columns at the bottom
-st.markdown("""
-    <div style='background-color: #262730; padding: 10px; border-radius: 10px; margin-bottom: 15px;'>
-    <h2 style='color: #FAFAFA; text-align: center; margin-bottom: 10px; font-size: 20px;'>Performance Analytics</h2>
-    </div>
-""", unsafe_allow_html=True)
-
+# Display summary statistics
 col1, col2, col3 = st.columns(3)
 
 with col1:
-    # Summary Statistics
-    st.markdown("""
-        <div style='background-color: #262730; padding: 8px; border-radius: 8px; margin-bottom: 10px;'>
-        <h3 style='color: #FAFAFA; text-align: center; margin: 0; font-size: 16px;'>Summary Statistics</h3>
-        </div>
-    """, unsafe_allow_html=True)
-    
-    # Metrics in 2x2 grid
-    metric_col1, metric_col2 = st.columns(2)
-    with metric_col1:
-        st.metric("Average P/L%", f"{filtered_df['Current_PL_Percent'].mean():.2f}%")
-        st.metric("Min P/L%", f"{filtered_df['Current_PL_Percent'].min():.2f}%")
-    with metric_col2:
-        st.metric("Max P/L%", f"{filtered_df['Current_PL_Percent'].max():.2f}%")
-        st.metric("# of Tokens", len(filtered_df))
+    st.markdown("### Top Performers")
+    st.dataframe(
+        filtered_df.nlargest(5, 'Current_PL_Percent')[['Token', 'Current_PL_Percent']],
+        hide_index=True
+    )
 
 with col2:
-    # Top Performers
-    st.markdown("""
-        <div style='background-color: #262730; padding: 8px; border-radius: 8px; margin-bottom: 10px;'>
-        <h3 style='color: #FAFAFA; text-align: center; margin: 0; font-size: 16px;'>Top Performers</h3>
-        </div>
-    """, unsafe_allow_html=True)
-    top_performers = filtered_df.nlargest(5, 'Current_PL_Percent')
+    st.markdown("### Bottom Performers")
     st.dataframe(
-        top_performers[['Token', 'Current_PL_Percent']].style
-        .format({'Current_PL_Percent': '{:.2f}%'})
-        .set_properties(**{
-            'background-color': '#262730',
-            'color': '#FAFAFA',
-            'font-size': '13px'
-        }),
-        hide_index=True,
-        height=200
+        filtered_df.nsmallest(5, 'Current_PL_Percent')[['Token', 'Current_PL_Percent']],
+        hide_index=True
     )
 
 with col3:
-    # Bottom Performers
-    st.markdown("""
-        <div style='background-color: #262730; padding: 8px; border-radius: 8px; margin-bottom: 10px;'>
-        <h3 style='color: #FAFAFA; text-align: center; margin: 0; font-size: 16px;'>Bottom Performers</h3>
-        </div>
-    """, unsafe_allow_html=True)
-    bottom_performers = filtered_df.nsmallest(5, 'Current_PL_Percent')
-    st.dataframe(
-        bottom_performers[['Token', 'Current_PL_Percent']].style
-        .format({'Current_PL_Percent': '{:.2f}%'})
-        .set_properties(**{
-            'background-color': '#262730',
-            'color': '#FAFAFA',
-            'font-size': '13px'
-        }),
-        hide_index=True,
-        height=200
-    )
+    st.markdown("### Summary Statistics")
+    stats_df = pd.DataFrame({
+        'Metric': ['Average P/L%', 'Median P/L%', 'Max P/L%', 'Min P/L%'],
+        'Value': [
+            f"{filtered_df['Current_PL_Percent'].mean():.2f}%",
+            f"{filtered_df['Current_PL_Percent'].median():.2f}%",
+            f"{filtered_df['Current_PL_Percent'].max():.2f}%",
+            f"{filtered_df['Current_PL_Percent'].min():.2f}%"
+        ]
+    })
+    st.dataframe(stats_df, hide_index=True)
